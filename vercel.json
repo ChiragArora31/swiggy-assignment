@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python -m compileall -q app main.py",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/main.py"
+    }
+  ],
+  "functions": {
+    "main.py": {
+      "runtime": "python3.12"
+    }
+  }
+}
