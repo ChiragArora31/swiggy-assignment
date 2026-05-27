@@ -4,6 +4,8 @@ Production-minded SDE-1 backend take-home implementation for a Jira-like project
 
 The project also includes a small built-in demo UI at `/demo`. It is intentionally not a separate frontend app; it exists to make the backend behavior easy to show during a review.
 
+Hosted prototype: https://swiggy-assignment-dun.vercel.app/demo
+
 ## Tech Stack
 
 - FastAPI with Swagger/OpenAPI at `/docs`
