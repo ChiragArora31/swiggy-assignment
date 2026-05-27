@@ -6,3 +6,4 @@ local.db
 .env
 .vercel/
 .DS_Store
+.vercel
