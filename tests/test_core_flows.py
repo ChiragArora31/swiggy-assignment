@@ -69,6 +69,56 @@ def test_comment_mention_creates_notification(client, auth_headers, db_session):
     assert "TST-1" in notification.message
 
 
+def test_comment_update_and_delete(client, auth_headers):
+    created = client.post(
+        "/api/issues/1/comments",
+        json={"body": "Initial review note"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201
+    comment_id = created.json()["id"]
+
+    updated = client.patch(
+        f"/api/issues/1/comments/{comment_id}",
+        json={"body": "Updated review note"},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["body"] == "Updated review note"
+
+    deleted = client.delete(f"/api/issues/1/comments/{comment_id}", headers=auth_headers)
+    assert deleted.status_code == 204
+
+    comments = client.get("/api/issues/1/comments", headers=auth_headers)
+    assert all(comment["id"] != comment_id for comment in comments.json())
+
+
+def test_custom_field_definition_and_value(client, auth_headers):
+    definition = client.post(
+        "/api/projects/1/custom-fields",
+        json={"key": "risk", "name": "Risk", "field_type": "dropdown", "options": ["low", "medium", "high"]},
+        headers=auth_headers,
+    )
+    assert definition.status_code == 201
+    field_id = definition.json()["id"]
+
+    value = client.put(
+        f"/api/issues/1/custom-fields/{field_id}",
+        json={"value": "high"},
+        headers=auth_headers,
+    )
+    assert value.status_code == 200
+    assert value.json()["key"] == "risk"
+    assert value.json()["value"] == "high"
+
+    invalid = client.put(
+        f"/api/issues/1/custom-fields/{field_id}",
+        json={"value": "urgent"},
+        headers=auth_headers,
+    )
+    assert invalid.status_code == 422
+
+
 def test_search_and_structured_filters(client, auth_headers):
     response = client.get(
         "/api/search",

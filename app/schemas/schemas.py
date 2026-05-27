@@ -141,6 +141,10 @@ class CommentCreate(BaseModel):
     parent_comment_id: int | None = None
 
 
+class CommentUpdate(BaseModel):
+    body: str = Field(min_length=1)
+
+
 class CommentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -193,3 +197,40 @@ class NotificationRead(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class CustomFieldDefinitionCreate(BaseModel):
+    key: str = Field(min_length=1, max_length=80, pattern="^[a-zA-Z][a-zA-Z0-9_]*$")
+    name: str = Field(min_length=1, max_length=160)
+    field_type: str = Field(pattern="^(text|number|dropdown|date)$")
+    options: list[str] | None = None
+    is_required: bool = False
+
+
+class CustomFieldDefinitionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int
+    key: str
+    name: str
+    field_type: str
+    options: list[str] | None
+    is_required: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class CustomFieldValueUpsert(BaseModel):
+    value: Any
+
+
+class CustomFieldValueRead(BaseModel):
+    id: int
+    issue_id: int
+    field_definition_id: int
+    key: str
+    name: str
+    field_type: str
+    value: Any
+    updated_at: datetime

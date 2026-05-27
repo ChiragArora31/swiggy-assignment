@@ -102,6 +102,12 @@ uvicorn app.main:app --reload
 - `POST /api/projects/{project_id}/sprints/move-issues` moves issues between backlog and sprint
 - `GET /api/issues/{issue_id}/comments` lists threaded comments
 - `POST /api/issues/{issue_id}/comments` adds a comment and creates mention notifications
+- `PATCH /api/issues/{issue_id}/comments/{comment_id}` edits an author's comment
+- `DELETE /api/issues/{issue_id}/comments/{comment_id}` deletes an author's comment
+- `GET /api/projects/{project_id}/custom-fields` lists project custom field definitions
+- `POST /api/projects/{project_id}/custom-fields` creates text, number, dropdown, or date custom fields
+- `GET /api/issues/{issue_id}/custom-fields` lists custom values for an issue
+- `PUT /api/issues/{issue_id}/custom-fields/{field_definition_id}` sets or updates an issue custom field value
 - `POST /api/issues/{issue_id}/watch` watches an issue
 - `DELETE /api/issues/{issue_id}/watch` unwatches an issue
 - `GET /api/projects/{project_id}/activity` returns a paginated activity feed
@@ -265,7 +271,7 @@ Transitions can also pass `expected_version`, which applies the same conflict ch
 | Issue, Sprint, Comment | Implemented | `app/models/models.py` |
 | ActivityLog, Notification, Watcher | Implemented | `app/models/models.py` |
 | WorkflowStatus, WorkflowTransition | Implemented | `app/models/models.py`, `app/services/workflow.py` |
-| Custom fields | Implemented schema | `CustomFieldDefinition`, `CustomFieldValue` |
+| Custom fields | Implemented | schema plus `/api/projects/{id}/custom-fields` and `/api/issues/{id}/custom-fields/{field_id}` |
 | Epic/story/task/bug/sub-task types | Implemented | `Issue.issue_type`, parent validation |
 | Parent-child validation | Implemented | `app/services/issues.py` |
 | Project-scoped issue keys | Implemented | `create_issue`, `Project.next_issue_number` |
@@ -280,7 +286,7 @@ Transitions can also pass `expected_version`, which applies the same conflict ch
 | Sprint CRUD/start/complete | Implemented | `app/api/routes/sprints.py` |
 | Move issues between backlog/sprint | Implemented | `move-issues` endpoint |
 | Sprint velocity | Implemented and tested | sprint service/test |
-| Threaded comments | Implemented | `Comment.parent_comment_id` |
+| Threaded comment CRUD | Implemented | comment list/create/update/delete routes |
 | @mention notifications | Implemented and tested | comment service/test |
 | Notification endpoint | Implemented | `GET /api/notifications` |
 | Watch/unwatch | Implemented | issue routes |

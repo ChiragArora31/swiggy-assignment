@@ -9,6 +9,7 @@ from app.models import (
     ActivityLog,
     Comment,
     CustomFieldDefinition,
+    CustomFieldValue,
     Issue,
     Project,
     Sprint,
@@ -55,10 +56,7 @@ def seed() -> None:
         db.add(workspace)
         db.flush()
 
-        users = [
-            User(workspace_id=workspace.id, **data)
-            for data in SEEDED_USERS
-        ]
+        users = [User(workspace_id=workspace.id, **data) for data in SEEDED_USERS]
         db.add_all(users)
         db.flush()
 
@@ -166,6 +164,16 @@ def seed() -> None:
         story_comments = make_issue("story", "Threaded comments", description="Support replies and @mentions.", status="To Do", priority="high", assignee=users[1], parent=epic_collab, points=3, labels=["comments"])
         make_issue("bug", "Search misses comment text", description="Search should include comment body.", status="In Progress", priority="medium", assignee=users[2], parent=epic_collab, points=2, labels=["search"])
 
+        risk_field = CustomFieldDefinition(
+            project_id=project.id,
+            key="risk",
+            name="Risk",
+            field_type="dropdown",
+            options=["low", "medium", "high"],
+        )
+        db.add(risk_field)
+        db.flush()
+
         db.add_all(
             [
                 Comment(issue_id=story_oauth.id, author_id=users[0].id, body="@kavya please review the OAuth callback edge cases."),
@@ -173,7 +181,7 @@ def seed() -> None:
                 Watcher(issue_id=story_oauth.id, user_id=users[0].id),
                 Watcher(issue_id=story_oauth.id, user_id=users[2].id),
                 Watcher(issue_id=story_board.id, user_id=users[3].id),
-                CustomFieldDefinition(project_id=project.id, key="risk", name="Risk", field_type="dropdown", options=["low", "medium", "high"]),
+                CustomFieldValue(issue_id=story_oauth.id, field_definition_id=risk_field.id, value={"value": "medium"}),
             ]
         )
         db.commit()

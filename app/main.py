@@ -4,7 +4,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from app.api.routes import activity, auth, comments, demo as demo_routes, issues, projects, search, sprints, users
+from app.api.routes import activity, auth, comments, custom_fields, demo as demo_routes, issues, projects, search, sprints, users
 from app.core.config import get_settings
 from app.core.database import Base, SessionLocal, engine
 from app.demo import DEMO_HTML
@@ -24,6 +24,7 @@ app.include_router(projects.router, prefix="/api")
 app.include_router(issues.router, prefix="/api")
 app.include_router(sprints.router, prefix="/api")
 app.include_router(comments.router, prefix="/api")
+app.include_router(custom_fields.router, prefix="/api")
 app.include_router(activity.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
