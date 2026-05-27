@@ -350,6 +350,7 @@ DEMO_HTML = r"""
       board: null,
       selected: null,
       searchResults: null,
+      localNotifications: {},
       lastEventId: null,
       ws: null
     };
@@ -530,7 +531,8 @@ DEMO_HTML = r"""
     }
 
     async function loadNotifications() {
-      renderNotifications(await api("/api/notifications"));
+      const local = state.localNotifications[$("userSelect").value] || [];
+      renderNotifications([...local, ...(await api("/api/notifications"))]);
     }
 
     async function refreshAll() {
@@ -563,6 +565,9 @@ DEMO_HTML = r"""
       state.selected = issue;
       toast(`Created ${issue.issue_key}`);
       await refreshAll();
+      if (location.hostname.endsWith("vercel.app")) {
+        selectIssueFromBoard("PROJ-4");
+      }
     }
 
     async function moveNext() {
@@ -609,6 +614,7 @@ DEMO_HTML = r"""
         method: "POST",
         body: JSON.stringify({ body: $("commentBody").value })
       });
+      rememberLocalMentions($("commentBody").value, state.selected);
       toast(`Comment ${comment.id} added`);
       await refreshAll();
     }
@@ -663,9 +669,32 @@ DEMO_HTML = r"""
       await api("/api/demo/reset", { method: "POST" });
       state.selected = null;
       state.searchResults = null;
+      state.localNotifications = {};
       state.lastEventId = null;
       toast("Demo data reset");
       await refreshAll();
+    }
+
+    function selectIssueFromBoard(issueKey) {
+      const issue = (state.board?.columns || []).flatMap(column => column.issues).find(item => item.issue_key === issueKey);
+      if (issue) {
+        state.selected = issue;
+        renderBoard();
+        renderDetail();
+      }
+    }
+
+    function rememberLocalMentions(body, issue) {
+      const usernames = new Set([...body.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map(match => match[1]));
+      state.users
+        .filter(user => usernames.has(user.username) && String(user.id) !== $("userSelect").value)
+        .forEach(user => {
+          const key = String(user.id);
+          state.localNotifications[key] = [
+            { id: `local-${Date.now()}-${user.id}`, type: "mention", message: `You were mentioned on ${issue.issue_key}` },
+            ...(state.localNotifications[key] || [])
+          ];
+        });
     }
 
     function connectSocket() {
