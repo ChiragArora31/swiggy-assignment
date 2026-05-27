@@ -6,10 +6,5 @@
       "source": "/(.*)",
       "destination": "/main.py"
     }
-  ],
-  "functions": {
-    "main.py": {
-      "runtime": "python3.12"
-    }
-  }
+  ]
 }
