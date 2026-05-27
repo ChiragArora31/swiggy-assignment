@@ -42,7 +42,9 @@ DEMO_HTML = r"""
     }
     button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
     button.primary:hover { background: var(--brand-dark); }
+    button.secondary { background: #eef6f9; border-color: #bfdce7; color: var(--brand-dark); }
     button.danger { color: var(--red); border-color: #f0b8b3; background: var(--red-soft); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--line);
@@ -84,7 +86,7 @@ DEMO_HTML = r"""
       border-radius: 8px;
       padding: 12px;
       display: grid;
-      grid-template-columns: 1.2fr repeat(4, minmax(110px, .7fr)) auto;
+      grid-template-columns: 1.2fr repeat(4, minmax(110px, .7fr)) auto auto;
       gap: 10px;
       align-items: end;
     }
@@ -215,6 +217,7 @@ DEMO_HTML = r"""
       <div class="top-actions">
         <select id="userSelect" title="Current demo user"></select>
         <button id="refreshBtn">Refresh</button>
+        <button id="resetBtn" class="secondary">Reset Demo</button>
         <a href="/docs" target="_blank">Swagger</a>
         <a href="/health" target="_blank">Health</a>
       </div>
@@ -252,6 +255,7 @@ DEMO_HTML = r"""
             <select id="sprintFilter"><option value="">Any</option></select>
           </label>
           <button id="searchBtn" class="primary">Search</button>
+          <button id="clearSearchBtn">Clear</button>
         </div>
         <div id="board" class="board"></div>
       </section>
@@ -289,10 +293,10 @@ DEMO_HTML = r"""
               </label>
             </div>
             <label>Title
-              <input id="newTitle" value="Demo API review flow" />
+              <input id="newTitle" value="Improve payment retry observability" />
             </label>
             <label>Description
-              <textarea id="newDescription">Created from the live demo UI.</textarea>
+              <textarea id="newDescription">Add backend visibility for payment retry failures during checkout.</textarea>
             </label>
             <div class="grid2">
               <label>Assignee
@@ -362,6 +366,24 @@ DEMO_HTML = r"""
       window.__toastTimer = setTimeout(() => el.classList.remove("show"), 2800);
     }
 
+    async function safeRun(action, button) {
+      const previous = button?.textContent;
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Working...";
+      }
+      try {
+        await action();
+      } catch (error) {
+        toast(error.message.slice(0, 260));
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = previous;
+        }
+      }
+    }
+
     async function api(path, options = {}) {
       const response = await fetch(path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
       if (!response.ok) {
@@ -423,6 +445,7 @@ DEMO_HTML = r"""
         return;
       }
       const statusOptions = (state.board?.columns || []).map(col => `<option value="${col.status.name}">${col.status.name}</option>`).join("");
+      const nextStatus = nextStatusName(issue.status.name);
       box.innerHTML = `
         <p class="detail-title">${issue.issue_key}: ${escapeHtml(issue.title)}</p>
         <p class="description">${escapeHtml(issue.description || "No description")}</p>
@@ -436,11 +459,12 @@ DEMO_HTML = r"""
         </div>
         <div class="row">
           <button id="transitionBtn" class="primary">Transition</button>
+          <button id="nextBtn" class="secondary">Move next</button>
           <button id="invalidBtn" class="danger">Try invalid Done</button>
           <button id="staleBtn">Stale patch</button>
         </div>
         <label>Comment
-          <textarea id="commentBody">@bob please review ${issue.issue_key}.</textarea>
+          <textarea id="commentBody">@kavya please review ${issue.issue_key}.</textarea>
         </label>
         <button id="commentBtn">Add comment</button>
         <div class="meta">
@@ -449,11 +473,16 @@ DEMO_HTML = r"""
           <span>Sprint: ${issue.sprint_id || "Backlog"}</span>
         </div>
       `;
-      $("targetStatus").value = issue.status.name;
-      $("transitionBtn").onclick = transitionSelected;
-      $("invalidBtn").onclick = invalidTransition;
-      $("staleBtn").onclick = stalePatch;
-      $("commentBtn").onclick = addComment;
+      $("targetStatus").value = nextStatus || issue.status.name;
+      $("transitionBtn").onclick = (event) => safeRun(transitionSelected, event.currentTarget);
+      $("nextBtn").onclick = (event) => safeRun(moveNext, event.currentTarget);
+      $("invalidBtn").onclick = (event) => safeRun(invalidTransition, event.currentTarget);
+      $("staleBtn").onclick = (event) => safeRun(stalePatch, event.currentTarget);
+      $("commentBtn").onclick = (event) => safeRun(addComment, event.currentTarget);
+      if (!nextStatus) {
+        $("transitionBtn").disabled = true;
+        $("nextBtn").disabled = true;
+      }
     }
 
     function renderActivity(items = []) {
@@ -482,6 +511,7 @@ DEMO_HTML = r"""
       fillSelect($("sprintFilter"), state.sprints, s => `<option value="${s.id}">${s.name}</option>`, "Any");
       fillSelect($("completeSprint"), state.sprints.filter(s => s.state === "active"), s => `<option value="${s.id}">${s.name}</option>`);
       fillSelect($("carrySprint"), state.sprints.filter(s => s.state !== "completed"), s => `<option value="${s.id}">${s.name}</option>`);
+      $("completeBtn").disabled = !$("completeSprint").value || !$("carrySprint").value;
     }
 
     async function loadBoard() {
@@ -517,9 +547,12 @@ DEMO_HTML = r"""
     }
 
     async function createIssue() {
+      if (!$("newTitle").value.trim()) {
+        throw new Error("Title is required to create an issue.");
+      }
       const payload = {
         issue_type: $("newType").value,
-        title: $("newTitle").value,
+        title: $("newTitle").value.trim(),
         description: $("newDescription").value,
         priority: $("newPriority").value,
         assignee_id: Number($("newAssignee").value),
@@ -530,6 +563,17 @@ DEMO_HTML = r"""
       state.selected = issue;
       toast(`Created ${issue.issue_key}`);
       await refreshAll();
+    }
+
+    async function moveNext() {
+      if (!state.selected) return;
+      const target = nextStatusName(state.selected.status.name);
+      if (!target) {
+        toast(`${state.selected.issue_key} is already in the final status`);
+        return;
+      }
+      $("targetStatus").value = target;
+      await transitionSelected();
     }
 
     async function transitionSelected() {
@@ -548,30 +592,14 @@ DEMO_HTML = r"""
 
     async function invalidTransition() {
       if (!state.selected) return;
-      try {
-        await api(`/api/issues/${state.selected.id}/transitions`, {
-          method: "POST",
-          body: JSON.stringify({ target_status_name: "Done", expected_version: state.selected.version })
-        });
-      } catch (error) {
-        toast(`422 validation: ${error.message.slice(0, 180)}`);
-      }
+      const result = await api(`/api/demo/issues/${state.selected.id}/invalid-transition`, { method: "POST" });
+      toast(result.expected_error ? `422 validation: ${JSON.stringify(result.detail).slice(0, 180)}` : result.message);
     }
 
     async function stalePatch() {
       if (!state.selected) return;
-      await api(`/api/issues/${state.selected.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ expected_version: state.selected.version, priority: "critical" })
-      });
-      try {
-        await api(`/api/issues/${state.selected.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ expected_version: state.selected.version, title: `${state.selected.title} stale` })
-        });
-      } catch (error) {
-        toast(`409 conflict: ${error.message.slice(0, 180)}`);
-      }
+      const result = await api(`/api/demo/issues/${state.selected.id}/stale-conflict`, { method: "POST" });
+      toast(result.expected_error ? `409 conflict: ${JSON.stringify(result.detail).slice(0, 180)}` : result.message);
       await refreshAll();
     }
 
@@ -604,10 +632,22 @@ DEMO_HTML = r"""
       renderBoard();
     }
 
+    async function clearSearch() {
+      $("searchInput").value = "";
+      $("priorityFilter").value = "";
+      $("typeFilter").value = "";
+      $("assigneeFilter").value = "";
+      $("sprintFilter").value = "";
+      await loadBoard();
+    }
+
     async function completeSprint() {
       const sprintId = Number($("completeSprint").value);
       const targetId = Number($("carrySprint").value);
-      if (!sprintId || !targetId) return;
+      if (!sprintId || !targetId) {
+        toast("No active sprint is available to complete.");
+        return;
+      }
       const activeIssues = state.board.columns.flatMap(c => c.issues).filter(i => i.sprint_id === sprintId && !i.status.is_done);
       const carryIds = activeIssues.slice(0, 2).map(i => i.id);
       const result = await api(`/api/sprints/${sprintId}/complete`, {
@@ -619,8 +659,19 @@ DEMO_HTML = r"""
       await refreshAll();
     }
 
+    async function resetDemo() {
+      await api("/api/demo/reset", { method: "POST" });
+      state.selected = null;
+      state.searchResults = null;
+      state.lastEventId = null;
+      toast("Demo data reset");
+      await refreshAll();
+    }
+
     function connectSocket() {
       if (!("WebSocket" in window)) return;
+      if (location.hostname.endsWith("vercel.app")) return;
+      if (state.ws) state.ws.close();
       const protocol = location.protocol === "https:" ? "wss" : "ws";
       const url = `${protocol}://${location.host}/ws/projects/1/board?user_id=${$("userSelect").value || 1}${state.lastEventId ? `&last_event_id=${state.lastEventId}` : ""}`;
       try {
@@ -638,6 +689,12 @@ DEMO_HTML = r"""
       }
     }
 
+    function nextStatusName(current) {
+      const order = ["To Do", "In Progress", "In Review", "Done"];
+      const index = order.indexOf(current);
+      return index >= 0 && index < order.length - 1 ? order[index + 1] : null;
+    }
+
     function escapeHtml(value) {
       return String(value ?? "")
         .replaceAll("&", "&amp;")
@@ -647,12 +704,14 @@ DEMO_HTML = r"""
         .replaceAll("'", "&#039;");
     }
 
-    $("refreshBtn").onclick = refreshAll;
-    $("createBtn").onclick = createIssue;
-    $("watchBtn").onclick = watchSelected;
-    $("searchBtn").onclick = searchIssues;
-    $("completeBtn").onclick = completeSprint;
-    $("userSelect").onchange = () => { loadNotifications(); connectSocket(); };
+    $("refreshBtn").onclick = (event) => safeRun(refreshAll, event.currentTarget);
+    $("resetBtn").onclick = (event) => safeRun(resetDemo, event.currentTarget);
+    $("createBtn").onclick = (event) => safeRun(createIssue, event.currentTarget);
+    $("watchBtn").onclick = (event) => safeRun(watchSelected, event.currentTarget);
+    $("searchBtn").onclick = (event) => safeRun(searchIssues, event.currentTarget);
+    $("clearSearchBtn").onclick = (event) => safeRun(clearSearch, event.currentTarget);
+    $("completeBtn").onclick = (event) => safeRun(completeSprint, event.currentTarget);
+    $("userSelect").onchange = () => safeRun(async () => { await loadNotifications(); connectSocket(); });
 
     refreshAll()
       .then(connectSocket)

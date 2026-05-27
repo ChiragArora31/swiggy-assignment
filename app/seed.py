@@ -20,10 +20,34 @@ from app.models import (
 )
 
 
+SEEDED_USERS = [
+    {"email": "aditi.sharma@example.com", "username": "aditi", "display_name": "Aditi Sharma"},
+    {"email": "arjun.menon@example.com", "username": "arjun", "display_name": "Arjun Menon"},
+    {"email": "kavya.nair@example.com", "username": "kavya", "display_name": "Kavya Nair"},
+    {"email": "rohan.rao@example.com", "username": "rohan", "display_name": "Rohan Rao"},
+    {"email": "priya.singh@example.com", "username": "priya", "display_name": "Priya Singh"},
+]
+
+
+def reset_seed_data() -> None:
+    Base.metadata.drop_all(bind=engine)
+    seed()
+
+
+def normalize_existing_seed(db) -> None:
+    users = list(db.scalars(select(User).order_by(User.id.asc()).limit(len(SEEDED_USERS))))
+    for user, data in zip(users, SEEDED_USERS):
+        user.email = data["email"]
+        user.username = data["username"]
+        user.display_name = data["display_name"]
+
+
 def seed() -> None:
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         if db.scalar(select(Project).where(Project.key == "PROJ")):
+            normalize_existing_seed(db)
+            db.commit()
             print("Seed data already exists")
             return
 
@@ -32,11 +56,8 @@ def seed() -> None:
         db.flush()
 
         users = [
-            User(workspace_id=workspace.id, email="alice@example.com", username="alice", display_name="Alice Sharma"),
-            User(workspace_id=workspace.id, email="bob@example.com", username="bob", display_name="Bob Chen"),
-            User(workspace_id=workspace.id, email="carol@example.com", username="carol", display_name="Carol Mehta"),
-            User(workspace_id=workspace.id, email="dinesh@example.com", username="dinesh", display_name="Dinesh Rao"),
-            User(workspace_id=workspace.id, email="emma@example.com", username="emma", display_name="Emma Singh"),
+            User(workspace_id=workspace.id, **data)
+            for data in SEEDED_USERS
         ]
         db.add_all(users)
         db.flush()
@@ -147,7 +168,7 @@ def seed() -> None:
 
         db.add_all(
             [
-                Comment(issue_id=story_oauth.id, author_id=users[0].id, body="@bob please review the OAuth callback edge cases."),
+                Comment(issue_id=story_oauth.id, author_id=users[0].id, body="@kavya please review the OAuth callback edge cases."),
                 Comment(issue_id=story_comments.id, author_id=users[2].id, body="Threading is ready for API review."),
                 Watcher(issue_id=story_oauth.id, user_id=users[0].id),
                 Watcher(issue_id=story_oauth.id, user_id=users[2].id),
